@@ -1,3 +1,5 @@
+use collectorlib::show_hello_world;
+
 fn main() {
-    println!("Hello, world!");
+    println!("{}", show_hello_world());
 }
