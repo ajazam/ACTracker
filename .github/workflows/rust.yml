@@ -18,14 +18,14 @@ jobs:
     - uses: actions/checkout@v2
 
     - name: Cache cargo dependencies
-        id: cache-cargo
-        uses: actions/cache@v2
-        with:
-          path: |
-            ./telemetry_collector/.cargo/registry
-            ./telemetry_collector/.cargo/git
-            ./telemetry_collector/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      id: cache-cargo
+      uses: actions/cache@v2
+      with:
+        path: |
+          ./telemetry_collector/.cargo/registry
+          ./telemetry_collector/.cargo/git
+          ./telemetry_collector/target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     - name: change working directory
       working-directory: ./telemetry_collector
       run: |
