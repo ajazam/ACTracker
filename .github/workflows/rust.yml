@@ -17,8 +17,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: change working directory
-      run: cwd telemetry_collector
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+      working-directory: ./telemetry_collector
+      run: |
+        cargo build --verbose
+        cargo test --verbose
