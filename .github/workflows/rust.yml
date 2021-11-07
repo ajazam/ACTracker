@@ -26,7 +26,7 @@ jobs:
           ./telemetry_collector/.cargo/git
           ./telemetry_collector/target
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-    - name: change working directory
+    - name: Build and Test
       working-directory: ./telemetry_collector
       run: |
         cargo build --verbose
