@@ -16,7 +16,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-      -
+
     - name: Cache cargo dependencies
         id: cache-cargo
         uses: actions/cache@v2
