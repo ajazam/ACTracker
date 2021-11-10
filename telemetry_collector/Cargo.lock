@@ -547,6 +547,7 @@ name = "telemetry_collector"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "bytes",
  "serde",
  "tokio",
  "tower",
