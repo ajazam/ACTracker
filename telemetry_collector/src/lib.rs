@@ -1,7 +1,20 @@
+use crate::encoder::Encoder;
+use bytes::{BufMut, BytesMut};
+
 struct Handshaker {
     identifier: i32,
     version: i32,
     operation_id: i32,
+}
+
+impl Encoder for Handshaker {
+    fn encode(&self) -> BytesMut {
+        let mut bytes = BytesMut::with_capacity(12);
+        bytes.put_i32(self.identifier);
+        bytes.put_i32(self.version);
+        bytes.put_i32(self.operation_id);
+        bytes
+    }
 }
 
 struct HandshakerResponse {
@@ -9,8 +22,32 @@ struct HandshakerResponse {
     driver_name: String,
     identifier: i32,
     version: i32,
-    track_number: String,
+    track_name: String,
     track_config: String,
+}
+
+impl Encoder for HandshakerResponse {
+    fn encode(&self) -> BytesMut {
+        let mut bytes = BytesMut::with_capacity(100);
+
+        bytes.put(self.car_name.as_bytes());
+        bytes.put_u8(0);
+
+        bytes.put(self.driver_name.as_bytes());
+        bytes.put_u8(0);
+
+        bytes.put_i32(self.identifier);
+
+        bytes.put_i32(self.version);
+
+        bytes.put(self.track_name.as_bytes());
+        bytes.put_u8(0);
+
+        bytes.put(self.track_config.as_bytes());
+        bytes.put_u8(0);
+
+        bytes
+    }
 }
 
 struct RTCarInfo {
@@ -76,7 +113,7 @@ pub fn show_hello_world() -> String {
 }
 
 mod parser {
-    use bytes::{Buf, Bytes, BytesMut};
+    use bytes::{Buf, BytesMut};
 
     pub fn parse_string(mut b: BytesMut) -> (Option<String>, BytesMut) {
         if b.is_empty() {
@@ -102,10 +139,27 @@ mod parser {
     }
 }
 
+mod encoder {
+    use crate::Handshaker;
+    use bytes::{BufMut, BytesMut};
+
+    pub trait Encoder {
+        fn encode(&self) -> BytesMut;
+    }
+
+    fn encoder(hand_shaker: Handshaker, mut bytes: BytesMut) -> BytesMut {
+        bytes.put_i32(hand_shaker.identifier);
+        bytes.put_i32(hand_shaker.version);
+        bytes.put_i32(hand_shaker.operation_id);
+
+        bytes
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::parser::parse_string;
-    use crate::show_hello_world;
+    use crate::{show_hello_world, Encoder, Handshaker, HandshakerResponse};
     use bytes::{BufMut, BytesMut};
 
     fn test_hello_world_text() {
@@ -113,7 +167,7 @@ mod tests {
     }
 
     #[test]
-    fn hello_world_with_null_byte_parsed_correctly() {
+    fn test_hello_world_with_null_byte_parsed_correctly() {
         let mut hello_world_bytes = BytesMut::with_capacity(64);
         hello_world_bytes.put(&b"Hello World\x00"[..]);
         let (str, remaining_bytes) = parse_string(hello_world_bytes);
@@ -122,11 +176,66 @@ mod tests {
     }
 
     #[test]
-    fn hello_world_without_zero_terminated_string_parsed_correctly() {
+    fn test_hello_world_without_zero_terminated_string_parsed_correctly() {
         let mut hello_world_bytes = BytesMut::with_capacity(64);
         hello_world_bytes.put(&b"Hello World"[..]);
         let (str, remaining_bytes) = parse_string(hello_world_bytes);
         assert_eq!(str.unwrap(), "");
         assert_eq!(remaining_bytes.len(), 11);
+    }
+
+    #[test]
+    fn test_encode_handshaker_packet() {
+        let handshaker = Handshaker {
+            identifier: 1,
+            version: 23,
+            operation_id: 4,
+        };
+
+        let mut expected_bytes = BytesMut::with_capacity(12);
+        expected_bytes.put_i32(handshaker.identifier);
+        expected_bytes.put_i32(handshaker.version);
+        expected_bytes.put_i32(handshaker.operation_id);
+
+        let actual_encoded = handshaker.encode();
+
+        assert_eq!(expected_bytes, actual_encoded);
+    }
+
+    #[test]
+    fn test_encode_handshakerresponse_packet() {
+        let handshaker_response = HandshakerResponse {
+            car_name: "jabbarcar".to_string(),
+            driver_name: "jabbarazam,".to_string(),
+            identifier: 99,
+            version: 123,
+            track_name: "the track".to_string(),
+            track_config: "very fast".to_string(),
+        };
+
+        let mut expected_bytes = BytesMut::with_capacity(100);
+        let car_name = String::from(&handshaker_response.car_name);
+        expected_bytes.put(car_name.as_bytes());
+        expected_bytes.put_u8(0);
+
+        let driver_name = String::from(&handshaker_response.driver_name);
+        expected_bytes.put(driver_name.as_bytes());
+        expected_bytes.put_u8(0);
+
+        expected_bytes.put_i32(handshaker_response.identifier);
+
+        expected_bytes.put_i32(handshaker_response.version);
+
+        let track_name = String::from(&handshaker_response.track_name);
+        expected_bytes.put(track_name.as_bytes());
+        expected_bytes.put_u8(0);
+
+        let track_config = String::from(&handshaker_response.track_config);
+        expected_bytes.put(track_config.as_bytes());
+        expected_bytes.put_u8(0);
+
+        let actual_encoded = handshaker_response.encode();
+
+        assert_eq!(expected_bytes, actual_encoded);
     }
 }
