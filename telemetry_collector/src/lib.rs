@@ -1,5 +1,6 @@
-use crate::encoder::Encoder;
-use bytes::{BufMut, BytesMut};
+use crate::encoder::{Decoder, Encoder};
+use crate::parser::parse_string;
+use bytes::{Buf, BufMut, BytesMut};
 
 struct Handshaker {
     identifier: i32,
@@ -16,7 +17,7 @@ impl Encoder for Handshaker {
         bytes
     }
 }
-
+#[derive(Debug, PartialEq)]
 struct HandshakerResponse {
     car_name: String,
     driver_name: String,
@@ -47,6 +48,43 @@ impl Encoder for HandshakerResponse {
         bytes.put_u8(0);
 
         bytes
+    }
+}
+
+impl Decoder for HandshakerResponse {
+    fn decode(encoded_bytes: &mut BytesMut) -> Self {
+        let mut car_name: String = String::from("");
+        let mut driver_name: String = String::from("");
+        let mut track_name: String = String::from("");
+        let mut track_config: String = String::from("");
+
+        if let Some(parsed_car_name) = parse_string(encoded_bytes) {
+            car_name = parsed_car_name;
+        }
+
+        if let Some(parsed_driver_name) = parse_string(encoded_bytes) {
+            driver_name = parsed_driver_name;
+        }
+
+        let identifier = encoded_bytes.get_i32();
+        let version = encoded_bytes.get_i32();
+
+        if let Some(parsed_track_name) = parse_string(encoded_bytes) {
+            track_name = parsed_track_name;
+        }
+
+        if let Some(parsed_track_config) = parse_string(encoded_bytes) {
+            track_config = parsed_track_config;
+        }
+
+        HandshakerResponse {
+            car_name,
+            driver_name,
+            identifier,
+            version,
+            track_name,
+            track_config,
+        }
     }
 }
 
@@ -115,27 +153,27 @@ pub fn show_hello_world() -> String {
 mod parser {
     use bytes::{Buf, BytesMut};
 
-    pub fn parse_string(mut b: BytesMut) -> (Option<String>, BytesMut) {
+    pub fn parse_string(b: &mut BytesMut) -> Option<String> {
         if b.is_empty() {
-            return (None, b);
+            return None;
         }
 
-        let mut c = b.clone();
+        let c = b.clone();
+        println!("clone is {:?}", c.clone().to_vec());
+
         let mut str = String::from("");
-        if let Some(size) = c.iter().position(|&x| x == 0) {
-            let mut s_vec = vec![];
-            for i in c.take(size).into_inner().iter() {
-                s_vec.push(*i);
-                let ignore = b.get_u8();
-            }
+        let mut parsed_str = String::from("");
+        let mut dst: Vec<u8> = vec![];
+        if let Some(i) = c.iter().position(|&x| x == 0) {
+            let mut raw_parsed_str = (b.split_to(i + 1)).to_vec();
+            raw_parsed_str.remove(raw_parsed_str.len() - 1);
 
-            if !s_vec.is_empty() {
-                s_vec.remove(s_vec.len() - 1);
-            }
-            str = String::from_utf8(s_vec).unwrap();
+            let mut v: Vec<u8> = Vec::new();
+            v.append(&mut raw_parsed_str);
+            parsed_str = String::from_utf8(v).unwrap();
         }
 
-        (Some(str), b)
+        Some(parsed_str)
     }
 }
 
@@ -145,6 +183,10 @@ mod encoder {
 
     pub trait Encoder {
         fn encode(&self) -> BytesMut;
+    }
+
+    pub trait Decoder {
+        fn decode(encode_bytes: &mut bytes::BytesMut) -> Self;
     }
 
     fn encoder(hand_shaker: Handshaker, mut bytes: BytesMut) -> BytesMut {
@@ -158,30 +200,39 @@ mod encoder {
 
 #[cfg(test)]
 mod tests {
+    use crate::encoder::Decoder;
     use crate::parser::parse_string;
     use crate::{show_hello_world, Encoder, Handshaker, HandshakerResponse};
     use bytes::{BufMut, BytesMut};
 
+    #[test]
     fn test_hello_world_text() {
         assert_eq!(show_hello_world(), "Hello World");
     }
 
     #[test]
-    fn test_hello_world_with_null_byte_parsed_correctly() {
+    fn test_hello_world_with_null_byte_parsed_correctly_for_text() {
         let mut hello_world_bytes = BytesMut::with_capacity(64);
-        hello_world_bytes.put(&b"Hello World\x00"[..]);
-        let (str, remaining_bytes) = parse_string(hello_world_bytes);
+        hello_world_bytes.put(&b"Hello World\x001"[..]);
+        let str = parse_string(&mut hello_world_bytes);
         assert_eq!(str.unwrap(), "Hello World");
-        assert_eq!(remaining_bytes.len(), 0);
+    }
+
+    #[test]
+    fn test_hello_world_with_null_byte_parsed_correctly_for_len() {
+        let mut hello_world_bytes = BytesMut::with_capacity(64);
+        hello_world_bytes.put(&b"Hello World\x001"[..]);
+        let str = parse_string(&mut hello_world_bytes);
+        assert_eq!(hello_world_bytes.len(), 1);
     }
 
     #[test]
     fn test_hello_world_without_zero_terminated_string_parsed_correctly() {
         let mut hello_world_bytes = BytesMut::with_capacity(64);
         hello_world_bytes.put(&b"Hello World"[..]);
-        let (str, remaining_bytes) = parse_string(hello_world_bytes);
+        let str = parse_string(&mut hello_world_bytes);
         assert_eq!(str.unwrap(), "");
-        assert_eq!(remaining_bytes.len(), 11);
+        assert_eq!(hello_world_bytes.len(), 11);
     }
 
     #[test]
@@ -237,5 +288,41 @@ mod tests {
         let actual_encoded = handshaker_response.encode();
 
         assert_eq!(expected_bytes, actual_encoded);
+    }
+    #[test]
+    fn test_decode_handshakerresponse_packet() {
+        let handshaker_response = HandshakerResponse {
+            car_name: "jabbarcar".to_string(),
+            driver_name: "jabbarazam,".to_string(),
+            identifier: 99,
+            version: 123,
+            track_name: "the track".to_string(),
+            track_config: "very fast".to_string(),
+        };
+
+        let mut encoded_bytes: BytesMut = BytesMut::with_capacity(100);
+
+        encoded_bytes.put(handshaker_response.car_name.as_bytes());
+        encoded_bytes.put_u8(0);
+
+        encoded_bytes.put(handshaker_response.driver_name.as_bytes());
+        encoded_bytes.put_u8(0);
+
+        encoded_bytes.put_i32(handshaker_response.identifier);
+
+        encoded_bytes.put_i32(handshaker_response.version);
+
+        encoded_bytes.put(handshaker_response.track_name.as_bytes());
+        encoded_bytes.put_u8(0);
+
+        encoded_bytes.put(handshaker_response.track_config.as_bytes());
+        encoded_bytes.put_u8(0);
+
+        let decoded_response = HandshakerResponse::decode(&mut encoded_bytes);
+
+        println!("expected is {:?}", handshaker_response);
+        println!("decoded is {:?}", decoded_response);
+
+        assert_eq!(handshaker_response, decoded_response);
     }
 }
