@@ -88,6 +88,153 @@ impl Decoder for HandshakerResponse {
     }
 }
 
+impl Decoder for RTCarInfo {
+    fn decode(encode_bytes: &mut BytesMut) -> Self {
+        RTCarInfo {
+            identifier: char::from(encode_bytes.get_u8()),
+            size: encode_bytes.get_i32(),
+            speed_kmh: encode_bytes.get_f32(),
+            speed_mph: encode_bytes.get_f32(),
+            speed_ms: encode_bytes.get_f32(),
+            is_abs_enabled: encode_bytes.get_u8() == 1,
+            is_abs_in_action: encode_bytes.get_u8() == 1,
+            is_tc_in_action: encode_bytes.get_u8() == 1,
+            is_tc_enabled: encode_bytes.get_u8() == 1,
+            is_in_pit: encode_bytes.get_u8() == 1,
+            is_engine_limiter_on: encode_bytes.get_u8() == 1,
+            accg_vertical: encode_bytes.get_f32(),
+            accg_horizontal: encode_bytes.get_f32(),
+            accg_frontal: encode_bytes.get_f32(),
+            lap_time: encode_bytes.get_i32(),
+            last_lap: encode_bytes.get_i32(),
+            best_lap: encode_bytes.get_i32(),
+            lap_count: encode_bytes.get_i32(),
+            gas: encode_bytes.get_f32(),
+            brake: encode_bytes.get_f32(),
+            clutch: encode_bytes.get_f32(),
+            engine_rpm: encode_bytes.get_f32(),
+            steer: encode_bytes.get_f32(),
+            gear: encode_bytes.get_i32(),
+            cg_height: encode_bytes.get_f32(),
+            wheel_angular_speed: [
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+            ],
+            slip_angle: [
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+            ],
+            slip_angle_contact_patch: [
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+            ],
+            slip_ratio: [
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+            ],
+            tyre_slip: [
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+            ],
+            nd_slip: [
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+            ],
+            load: [
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+            ],
+            dy: [
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+            ],
+            mz: [
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+            ],
+            tyre_dirty_level: [
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+            ],
+            camber_rad: [
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+            ],
+            tyre_radius: [
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+            ],
+            tyre_loaded_radius: [
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+            ],
+            suspension_height: [
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+            ],
+            car_position_normalizes: [
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+            ],
+            car_slope: [
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+            ],
+            car_coordinates: [
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+                encode_bytes.get_f32(),
+            ],
+        }
+    }
+}
+
+impl Decoder for RTLap {
+    fn decode(encoded_bytes: &mut BytesMut) -> Self {
+        RTLap {
+            car_identifier_number: encoded_bytes.get_i32(),
+            lap: encoded_bytes.get_i32(),
+            driver_name: parse_string(encoded_bytes).unwrap(),
+            car_name: parse_string(encoded_bytes).unwrap(),
+            time: encoded_bytes.get_i32(),
+        }
+    }
+}
+
+#[derive(PartialEq, Debug)]
 struct RTCarInfo {
     identifier: char,
     size: i32,
@@ -138,12 +285,13 @@ struct RTCarInfo {
     car_coordinates: [f32; 4],
 }
 
+#[derive(PartialEq, Debug)]
 struct RTLap {
     car_identifier_number: i32,
     lap: i32,
     driver_name: String,
     car_name: String,
-    time: String,
+    time: i32,
 }
 
 pub fn show_hello_world() -> String {
@@ -151,7 +299,7 @@ pub fn show_hello_world() -> String {
 }
 
 mod parser {
-    use bytes::{Buf, BytesMut};
+    use bytes::BytesMut;
 
     pub fn parse_string(b: &mut BytesMut) -> Option<String> {
         if b.is_empty() {
@@ -159,18 +307,13 @@ mod parser {
         }
 
         let c = b.clone();
-        println!("clone is {:?}", c.clone().to_vec());
 
-        let mut str = String::from("");
         let mut parsed_str = String::from("");
-        let mut dst: Vec<u8> = vec![];
+
         if let Some(i) = c.iter().position(|&x| x == 0) {
             let mut raw_parsed_str = (b.split_to(i + 1)).to_vec();
             raw_parsed_str.remove(raw_parsed_str.len() - 1);
-
-            let mut v: Vec<u8> = Vec::new();
-            v.append(&mut raw_parsed_str);
-            parsed_str = String::from_utf8(v).unwrap();
+            parsed_str = String::from_utf8(raw_parsed_str).unwrap();
         }
 
         Some(parsed_str)
@@ -202,8 +345,10 @@ mod encoder {
 mod tests {
     use crate::encoder::Decoder;
     use crate::parser::parse_string;
-    use crate::{show_hello_world, Encoder, Handshaker, HandshakerResponse};
+    use crate::{show_hello_world, Encoder, Handshaker, HandshakerResponse, RTCarInfo, RTLap};
     use bytes::{BufMut, BytesMut};
+    use pretty_assertions::assert_eq;
+    use std::mem::size_of;
 
     #[test]
     fn test_hello_world_text() {
@@ -289,6 +434,7 @@ mod tests {
 
         assert_eq!(expected_bytes, actual_encoded);
     }
+
     #[test]
     fn test_decode_handshakerresponse_packet() {
         let handshaker_response = HandshakerResponse {
@@ -320,9 +466,115 @@ mod tests {
 
         let decoded_response = HandshakerResponse::decode(&mut encoded_bytes);
 
-        println!("expected is {:?}", handshaker_response);
-        println!("decoded is {:?}", decoded_response);
-
         assert_eq!(handshaker_response, decoded_response);
+    }
+
+    #[test]
+    fn test_decode_rtcar_info_packet() {
+        let expected_rt_car_info_response = RTCarInfo {
+            identifier: 'i',
+            size: 0,
+            speed_kmh: 1.0,
+            speed_mph: 2.0,
+            speed_ms: 3.0,
+            is_abs_enabled: false,
+            is_abs_in_action: true,
+            is_tc_in_action: false,
+            is_tc_enabled: true,
+            is_in_pit: false,
+            is_engine_limiter_on: true,
+            accg_vertical: 4.0,
+            accg_horizontal: 5.0,
+            accg_frontal: 6.0,
+            lap_time: 7,
+            last_lap: 8,
+            best_lap: 9,
+            lap_count: 10,
+            gas: 11.0,
+            brake: 12.0,
+            clutch: 13.0,
+            engine_rpm: 14.0,
+            steer: 15.0,
+            gear: 16,
+            cg_height: 17.0,
+            wheel_angular_speed: [18.0, 19.0, 20.0, 21.0],
+            slip_angle: [22.0, 23.0, 24.0, 25.0],
+            slip_angle_contact_patch: [26.0, 27.0, 28.0, 29.0],
+            slip_ratio: [30.0, 31.0, 32.0, 33.0],
+            tyre_slip: [34.0, 35.0, 36.0, 37.0],
+            nd_slip: [38.0, 39.0, 40.0, 41.0],
+            load: [42.0, 43.0, 44.0, 45.0],
+            dy: [46.0, 47.0, 48.0, 49.0],
+            mz: [50.0, 51.0, 52.0, 53.0],
+            tyre_dirty_level: [54.0, 55.0, 56.0, 57.0],
+            camber_rad: [58.0, 59.0, 60.0, 61.0],
+            tyre_radius: [62.0, 63.0, 64.0, 65.0],
+            tyre_loaded_radius: [66.0, 67.0, 68.0, 69.0],
+            suspension_height: [70.0, 71.0, 72.0, 73.0],
+            car_position_normalizes: [74.0, 75.0, 76.0, 77.0],
+            car_slope: [78.0, 79.0, 80.0, 81.0],
+            car_coordinates: [82.0, 83.0, 84.0, 85.0],
+        };
+
+        let mut encoded_rt_car_info_response = BytesMut::with_capacity(size_of::<RTCarInfo>());
+        println!("size is {}", size_of::<RTCarInfo>());
+
+        encoded_rt_car_info_response.put_u8(b'i'); // identifier
+        encoded_rt_car_info_response.put_i32(0); // size
+
+        encoded_rt_car_info_response.put_f32(1.0); // speed_kmh
+        encoded_rt_car_info_response.put_f32(2.0); // speed_mph
+        encoded_rt_car_info_response.put_f32(3.0); // speed_ms
+
+        encoded_rt_car_info_response.put_u8(0); // is_abs_enabled
+        encoded_rt_car_info_response.put_u8(1);
+        encoded_rt_car_info_response.put_u8(0);
+        encoded_rt_car_info_response.put_u8(1);
+        encoded_rt_car_info_response.put_u8(0);
+        encoded_rt_car_info_response.put_u8(1);
+
+        encoded_rt_car_info_response.put_f32(4.0); //
+        encoded_rt_car_info_response.put_f32(5.0);
+        encoded_rt_car_info_response.put_f32(6.0);
+
+        encoded_rt_car_info_response.put_i32(7);
+        encoded_rt_car_info_response.put_i32(8);
+        encoded_rt_car_info_response.put_i32(9);
+        encoded_rt_car_info_response.put_i32(10);
+
+        for value in 11u8..=15 {
+            encoded_rt_car_info_response.put_f32(1.0 * f32::from(value));
+        }
+        encoded_rt_car_info_response.put_i32(16);
+
+        for value in 17u8..=85 {
+            encoded_rt_car_info_response.put_f32(1.0 * f32::from(value));
+        }
+
+        let decoded_packet = RTCarInfo::decode(&mut encoded_rt_car_info_response);
+
+        assert_eq!(decoded_packet, expected_rt_car_info_response);
+    }
+
+    #[test]
+    fn test_decode_rtlap_packet() {
+        let expected_response = RTLap {
+            car_identifier_number: 1,
+            lap: 2,
+            driver_name: "jabbar azam".to_string(),
+            car_name: "jabbars car".to_string(),
+            time: 3,
+        };
+
+        let mut encoded_packet = BytesMut::with_capacity(100);
+        encoded_packet.put_i32(1);
+        encoded_packet.put_i32(2);
+        encoded_packet.put(&b"jabbar azam\x00"[..]);
+        encoded_packet.put(&b"jabbars car\x00"[..]);
+        encoded_packet.put_i32(3);
+
+        let decoded_packet = RTLap::decode(&mut encoded_packet);
+
+        assert_eq!(expected_response, decoded_packet);
     }
 }

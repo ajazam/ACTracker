@@ -15,6 +15,9 @@ tower-http = { version = "0.1", features = ["add-extension", "trace"] }
 serde = { version = "1.0", features = ["derive"] }
 bytes = "1"
 
+[dev-dependencies]
+pretty_assertions = "1.0.0"
+
 [lib]
 name = "collectorlib"
 path = "src/lib.rs"
