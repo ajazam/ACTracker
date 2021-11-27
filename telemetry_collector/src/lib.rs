@@ -321,8 +321,7 @@ mod parser {
 }
 
 mod encoder {
-    use crate::Handshaker;
-    use bytes::{BufMut, BytesMut};
+    use bytes::BytesMut;
 
     pub trait Encoder {
         fn encode(&self) -> BytesMut;
@@ -330,14 +329,6 @@ mod encoder {
 
     pub trait Decoder {
         fn decode(encode_bytes: &mut bytes::BytesMut) -> Self;
-    }
-
-    fn encoder(hand_shaker: Handshaker, mut bytes: BytesMut) -> BytesMut {
-        bytes.put_i32(hand_shaker.identifier);
-        bytes.put_i32(hand_shaker.version);
-        bytes.put_i32(hand_shaker.operation_id);
-
-        bytes
     }
 }
 
@@ -367,7 +358,7 @@ mod tests {
     fn test_hello_world_with_null_byte_parsed_correctly_for_len() {
         let mut hello_world_bytes = BytesMut::with_capacity(64);
         hello_world_bytes.put(&b"Hello World\x001"[..]);
-        let str = parse_string(&mut hello_world_bytes);
+        let _str = parse_string(&mut hello_world_bytes);
         assert_eq!(hello_world_bytes.len(), 1);
     }
 
